@@ -1,0 +1,189 @@
+#!/bin/sh
+# Extract manpages from C source files.
+
+# Copyright (C) 2006 Marc Vertes
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+
+# release 1.5.6
+
+man() {
+	cat << \EOT
+NAME
+  src2man - extract man pages from source files.
+SYNOPSIS
+  src2man [-n][-d date][-v volume][-r release] [srcfile ...]
+DESCRIPTION
+  src2man scans source file srcfile. Only C source files are supported
+  for now. Comments blocks starting by "/** num", where num is a section
+  number, are converted into a man file, using txt2man(1).
+
+  The first line of the comment block must contain the name of the
+  manpage, usually the function name, followed by a "-" and a short
+  description. The following lines are the "DESCRIPTION" section
+  content, except if they are in upper case, in which case they define
+  a new section.
+
+  If the next line after a comment block is empty, Then no "SYNOPSIS"
+  section will be generated. Otherwise, src2man will look in the following
+  source lines for a function prototype or a type definion (struct,
+  union, typedef, ...) matching the manpage name, and include it in a
+  "SYNOPSIS" section. This avoids to duplicate the type or function
+  prototype in the comment block.
+
+  The best place for code documentation is in the source file, where
+  the body is implemented, not the header file which only contains
+  the prototype. src2man automatically searches for the presence of a
+  prototype in the corresponding header file, and if found, will print a
+  "#include" statement in the synopsis.
+
+OPTIONS
+  -d date	Set the date of the man pages. Defaults to current date.
+  -n		No man page is created. The name of the manpages that would
+  		be created are printed.
+  -v volume	Specify the name of the volume to be printed in center header
+  		of generated manpages.
+  -r release	Specify the project name and release number for the generated
+		manpage.
+EXAMPLE
+  The following example displays C code and comments to generate a manpage
+  foobar.3:
+
+     /** 3
+      * foobar - a sample dummy function
+      * This line is now the first of the description section.
+      * Note that function parameters parm1 and parm2 are highlighted
+      * in the generated man page.
+      */
+     int foobar(char *parm1, int parm2)
+     {
+     	...
+	return 0;
+     }
+
+SEE ALSO
+  txt2man(1), bookman(1).
+AUTHOR
+  Marc Vertes <mvertes@free.fr>
+EOT
+}
+
+nogen=0
+release=unknown
+while getopts :d:hnr:v: opt
+do
+	case $opt in
+	(d) date="$OPTARG";;
+	(n) nogen=1;;
+	(v) volume="$OPTARG";;
+	(r) release="$OPTARG";;
+	(*) man; exit;;
+	esac
+done
+shift $(($OPTIND - 1))
+date=${date:-$(date +'%d %B %Y')}
+
+#
+# Extract manpages from source files. Man page content is enclosed in
+# commment blocks starting by "/** sectnum"
+#
+awk -v release="$release" -v volume="$volume" -v nogen=$nogen '
+$1 == "/**" && $2 ~ /^[0-9]/ {
+	sect = $2
+	getline
+	sub(/^ *\* */, "  ")
+	title = $1
+	line1_after_comment = 0
+	in_struct = 0
+	name = $0
+	inc = FILENAME
+	sub(/.[cS]$/, ".h", inc)
+	found = ""
+	grep_cmd = "test -f " inc " && grep -wq " title "  " inc " \
+		   2>/dev/null && echo ok || echo nok"
+	grep_cmd | getline found
+	# description section extraction.
+	in_synop = 0
+	synop = ""
+	while (getline) {
+		if ($0 ~ / *\*\//) { # end of comment block
+			sub(/ *\*\//, "")
+			line1_after_comment = 1
+			break
+		}
+		sub(/^ \* /, "")
+		sub(/^ \*/, "")
+		if ($1 ~ /^[A-Z ]+$/ && $1 != "SYNOPSIS")
+			in_synop = 0
+		if ($1 == "SYNOPSIS") {
+			in_synop = 1
+			continue
+		}
+		if ($1 == "DESCRIPTION")
+			continue
+		if (in_synop)
+			synop = synop (synop ? "\n" : "") $0
+		else
+			desc = desc (desc ? "\n" : "") $0
+	}
+	# function prototype or struct extraction for synopsis.
+	if (! synop) {
+		while (getline) {
+			if (line1_after_comment) {
+				line1_after_comment = 0
+				if (NF == 0) 
+					break
+				split(name, tname)
+			}
+			if ((!in_struct && $1 == "struct" && $2 == tname[1]) ||
+			    (!in_struct && $2 == "struct" && $3 == tname[1])) {
+			    	in_struct = 1
+				synop = synop (synop ? "\n" : "") $0
+				continue
+			}
+			synop = synop (synop ? "\n" : "") $0
+			if (in_struct) {
+				if ($0 ~ " *" tname[1] "[; ][*]*") break
+				continue
+			}
+			if ($0 !~ /\)$/) {
+				getline
+				synop = synop " " $0
+			}
+			if ($0 ~/\)[ \t{}\;]*$/) {
+				sub(/{[^}]}/, "", synop)
+				sub(/[ \t]*$/, "", synop)
+				if (found == "ok")
+					synop = "#include \"" inc "\"\n" synop
+				if (synop !~ /\;$/)
+					synop = synop ";"
+				break
+			}
+		}
+	}
+	print title "." sect > "/dev/stderr"
+	if (nogen) {
+		name = synop = desc = sect = ""
+		next
+	}
+	print "NAME\n" name (synop ? "\nSYNOPSIS\n  " synop : "") \
+	      "\nDESCRIPTION\n" desc "\nFILE\n  " FILENAME | \
+	      "{ echo '\''.\\\" Extracted by src2man from " FILENAME "'\''; \
+	      txt2man -d \"$date\" -v \"" volume "\" -r " release \
+	      " -s " sect " -t " title "; } >" title "." sect
+	name = synop = desc = sect = ""
+}
+' $*

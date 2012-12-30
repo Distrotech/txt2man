@@ -1,0 +1,60 @@
+txt2man-1.5.6	16-mar-2011
+
+* txt2man: Better control of 3 letters regexp, by Robin Cornelius.
+* txt2man: Fix header comment generation, by Robin Cornelius.
+* txt2man: Better handle ticks, by Thomas Moschny.
+* src2man: Fix header comment generation.
+* src2man: more robust comment delimiter handling.
+* src2man: support C prototypes with newline after type, by Diego Cena.
+* bookman: Posix shell syntax.
+
+txt2man-1.5.5	21-mar-2007
+
+* txt2man: correct layout of C structures in synopsis
+* src2man: genrate manpages for C types/struct definitions
+
+txt2man-1.5.4	16-mar-2007
+
+* bookman: Added copyright
+* src2man: Added copyright. Fix cover page handling. Add origin
+  comment in generated manpages.
+
+txt2man-1.5.3	15-mar-2007
+
+* bookman: better handling of header and footers of cover page.
+* src2man: date can now be set.
+* txt2man: date can now be set. Better handling of C function prototypes.
+
+txt2man-1.5.2	28-feb-2007
+
+* txt2man: fix synopsis handling.
+
+txt2man-1.5.1	25-oct-2006
+
+* src2man: search if the function prototype is defined in corresponding
+           '.h' include file, and if yes, add a '#include "file.h"'
+           statement in synopsis.
+* src2man: allow to force SYNOPSIS sections in comment blocks.
+* bookman: reads the file list from stdin in no arg is supplied.
+* Makefile: specify commands path (in current dir) when generating doc.
+
+txt2man-1.5	16-oct-2006
+
+* txt2man: fix indentation.
+* bookman: new command to generate a book from manpages.
+* src2man: new command to extract manpages from source files.
+* Makefile: update and fix rules.
+
+txt2man-1.4.8	07-jul-2003
+
+* txt2man: fix a bug in tag list parsing (bug discovered by Fredrik Steen)
+* txt2man: fix a bug in parsing spaces in empty lines
+* Makefile: Create install target directories, if not there
+
+txt2man-1.4.7	06-jan-2003
+
+* fix gawk --lint warnings (from Eric Moors)
+* fix a warning for an escape sequence (from Juergen Daubert)
+
+txt2man-1.4.6	16-dec-2002
+Changelog starts from here!
